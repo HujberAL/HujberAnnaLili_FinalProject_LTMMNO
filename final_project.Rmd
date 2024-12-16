@@ -1,0 +1,197 @@
+---
+title: "Final project"
+author: "Anna Lili Hujber"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("readxl")
+#install.packages("car")
+#install.packages("lmtest")
+#install.packages("broom")
+#install.packages("rstanarm")
+#install.packages("loo")
+
+library(readxl)
+library(car)
+library(lmtest)
+library(broom)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(rstanarm)
+library(loo)
+```
+
+## Reading raw dataset from link:
+
+```{r}
+cats_ref_dataset <- read.csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/4e5d6ce6b093c6586aefadc4eed5e861adcfe9de/data/2023/2023-01-31/cats_uk_reference.csv", sep = ',', stringsAsFactors = FALSE)
+cats_ref_dataset <- na.omit(cats_ref_dataset)
+```
+
+## EDA with plots
+### Cats' prey per month by age
+
+```{r}
+cats_prey <- cats_ref_dataset %>%
+  count(age_years, animal_sex, hrs_indoors, prey_p_month) %>%
+  group_by(hrs_indoors)
+cats_prey <- na.omit(cats_prey)
+
+ggplot(cats_prey, aes(age_years, prey_p_month, fill = animal_sex)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("m" = "blue", "f" = "pink"), labels = c("Female", "Male")) +
+  labs(x = "Age of cats", y = "Prey per month", fill = "Sex") +
+  theme_light() +  # Light theme
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+### Cats' prey per month by hours indoors
+
+```{r}
+ggplot(cats_prey, aes(hrs_indoors, prey_p_month, fill = animal_sex)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("m" = "blue", "f" = "pink"), labels = c("Female", "Male")) +
+  labs(x = "Hours indoors", y = "Prey per month", fill = "Sex") +
+  theme_light() +  # Light theme
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 0, hjust = 1)) +
+  coord_flip()
+```
+
+## Building model A:
+
+```{r}
+cats_ref_dataset$hunt <- as.factor(cats_ref_dataset$hunt) # Transform non-numeric predictors
+model_a <- lm(prey_p_month ~ age_years + hrs_indoors, data = cats_ref_dataset) # Creating the basic model
+model_a_sum <- summary(model_a)
+```
+
+## Checking for influential outliers in model A:
+
+```{r}
+c_dist_a <- cooks.distance(model_a) # Calculating Cook's distance for each data point
+inf_pts_a <- which(c_dist_a > 1) # Returns the row numbers where Cook's distance > 1
+inf_pts_a
+c_dist_a[inf_pts_a] # Display the influential points and the Cook's distance appointed to them
+```
+
+## Checking assumptions of model A
+### Normality assumption:
+
+```{r}
+plot(model_a, which = 2) # Generate a diagnostic plot (residuals vs. fitted)
+res_a <- residuals(model_a) # Extracting the residuals of the model
+shapiro.test(res_a) # Shapiro-Wilk normality test
+```
+
+Based on the Shapiro-Wilk test the data is not normally distributed as seen on the plot. The model should be built as a robust regression or a Bayesian general linear model.
+
+### Linearity assumption:
+
+```{r}
+plot(model_a, which = 1) # Generate a diagnostic plot (residuals vs. leverage)
+crPlots(model_a) # Checking the linearity assumption for each predictor
+```
+
+The plots show that there are some outliers. Significant nonlinearity also can be seen on the plots.
+
+### Homoscedasticity assumption:
+
+```{r}
+plot(model_a, which = 3) # Generate a scale-location plot for checking heteroscedasticity
+bptest(model_a) # Breusch-Pagan test
+```
+
+The test indicates significant heteroscedasticity in the model's residuals, as the p-value is < 0.05.
+
+### Multicollinearity assumption:
+
+```{r}
+vif(model_a) # Checking the multicollinearity assumption
+```
+
+Since the VIFs are close to 1, it suggests that there is no problematic multicollinearity in the model.
+
+## Building model A as Bayesian general linear model:
+
+```{r}
+cats_ref_dataset$hunt <- as.factor(cats_ref_dataset$hunt) # Transform non-numeric predictors
+cats_ref_dataset$animal_sex <- as.factor(cats_ref_dataset$animal_sex)
+model_a <- stan_glm(prey_p_month ~ age_years + hrs_indoors, data = cats_ref_dataset) # Creating the basic model
+model_a_sum <- summary(model_a)
+```
+
+## Building model B:
+
+```{r}
+model_b <- lm(prey_p_month ~ age_years + hunt + hrs_indoors + n_cats, data = cats_ref_dataset) # Creating the model
+model_b_sum <- summary(model_b)
+```
+
+## Checking for influential outliers in model B:
+
+```{r}
+c_dist_b <- cooks.distance(model_b) # Calculating Cook's distance for each data point
+inf_pts_b <- which(c_dist_b > 1) # Returns the row numbers where Cook's distance > 1
+inf_pts_b
+c_dist_b[inf_pts_b] # Display the influential points and the Cook's distance appointed to them
+```
+
+## Checking assumptions of model B:
+### Normality assumption:
+
+```{r}
+plot(model_b, which = 2) # Generate a diagnostic plot (residuals vs. fitted)
+res_b <- residuals(model_b) # Extracting the residuals of the model
+shapiro.test(res_b) # Shapiro-Wilk normality test
+```
+
+Based on the Shapiro-Wilk test the data is not normally distributed as seen on the plot. The model should be built as a robust regression or a Bayesian general linear model.
+
+### Linearity assumption:
+
+```{r}
+plot(model_b, which = 1) # Generate a diagnostic plot (residuals vs. leverage)
+crPlots(model_b) # Checking the linearity assumption for each predictor
+```
+
+The plots show that there are some outliers. Significant nonlinearity also can be seen on the plots.
+
+### Homoscedasticity assumption:
+
+```{r}
+plot(model_b, which = 3) # Generate a scale-location plot for checking heteroscedasticity
+bptest(model_b) # Breusch-Pagan test
+```
+
+The test indicates significant heteroscedasticity in the model's residuals, as the p-value is < 0.05.
+
+### Multicollinearity assumption:
+
+```{r}
+vif(model_b) # Checking the multicollinearity assumption
+```
+
+Since the VIFs are close to 1, it suggests that there is no problematic multicollinearity in the model.
+
+## Building model B as a Bayesian general linear model:
+
+```{r}
+model_b <- stan_glm(prey_p_month ~ age_years + hunt + hrs_indoors + n_cats, data = cats_ref_dataset) # Creating the model
+model_b_sum <- summary(model_b)
+```
+
+## Model comparison
+
+```{r}
+loo_model_a <- loo(model_a)
+loo_model_b <- loo(model_b)
+loo_compare(loo_model_a, loo_model_b)
+```
+
+Model B performs slightly better than Model A according to the test. However, the difference is very small and not statistically significant because the standard error calculated is significantly larger than the difference. There is no strong evidence that Model B should be preferred as opposed to Model A, because the uncertainty in the comparison is very high. The two models are likely to have a similar predictive performance. Using model parsimony, the simpler model should be chosen, in this case Model A.
+
