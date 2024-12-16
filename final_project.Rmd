@@ -121,7 +121,7 @@ Since the VIFs are close to 1, it suggests that there is no problematic multicol
 ```{r}
 cats_ref_dataset$hunt <- as.factor(cats_ref_dataset$hunt) # Transform non-numeric predictors
 cats_ref_dataset$animal_sex <- as.factor(cats_ref_dataset$animal_sex)
-model_a <- stan_glm(prey_p_month ~ age_years + hrs_indoors, data = cats_ref_dataset) # Creating the basic model
+model_a <- stan_glm(prey_p_month ~ age_years + hrs_indoors, data = cats_ref_dataset, refresh = 0) # Creating the basic model
 model_a_sum <- summary(model_a)
 ```
 
@@ -181,7 +181,7 @@ Since the VIFs are close to 1, it suggests that there is no problematic multicol
 ## Building model B as a Bayesian general linear model:
 
 ```{r}
-model_b <- stan_glm(prey_p_month ~ age_years + hunt + hrs_indoors + n_cats, data = cats_ref_dataset) # Creating the model
+model_b <- stan_glm(prey_p_month ~ age_years + hunt + hrs_indoors + n_cats, data = cats_ref_dataset, refresh = 0) # Creating the model
 model_b_sum <- summary(model_b)
 ```
 
